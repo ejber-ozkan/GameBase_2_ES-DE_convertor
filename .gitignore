@@ -1,0 +1,17 @@
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+
+# Python Virtual Environment and Cache
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Generated output XML
+Games/gamelist.xml
+
+# GameBase Database
+GBC_v19.mdb

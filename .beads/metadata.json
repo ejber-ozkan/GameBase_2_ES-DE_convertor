@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "GameBase_2_ES_DE_convertor",
+  "project_id": "d5a84b32-3cda-4dbb-b0b5-1bbc9d8f206a"
+}
