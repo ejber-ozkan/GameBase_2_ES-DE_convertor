@@ -2,6 +2,10 @@
 
 A platform-agnostic, dependency-free tool to convert Commodore 64 GameBase Access databases (`GBC_v19.mdb`) into metadata and media paths readable by **EmulationStation Desktop Edition (ES-DE)**.
 
+> [!NOTE]
+> **ES-DE vs. Legacy EmulationStation:**
+> This converter targets **ES-DE (EmulationStation Desktop Edition)**, which is the newer, active fork hosted at [GitLab](https://gitlab.com/es-de/emulationstation-de) (cloned locally at `D:\MYSOURCE\OtherPeeps\emulationstation-de`). Do not confuse this with the older, legacy EmulationStation application.
+
 It generates a portable `gamelist.xml` file with parent-relative paths (`../`) so that ES-DE can access the existing GameBase screenshots and cover art without copying, moving, or duplicating any files.
 
 ---
@@ -67,9 +71,9 @@ Follow these steps to load your converted Commodore 64 GameBase library in ES-DE
 ### Step 1: Configure ES-DE to Read Local gamelist.xml Files
 By default, ES-DE reads metadata from a centralized system-specific folder. To make it read the generated `gamelist.xml` file directly from your ROM folder:
 1. Open your ES-DE configuration settings file:
-   - **Windows:** `%USERPROFILE%\.emulationstation\es_settings.xml`
-   - **macOS:** `~/.emulationstation/es_settings.xml`
-   - **Linux:** `~/.emulationstation/es_settings.xml`
+   - **Windows:** `%USERPROFILE%\.ES-DE\settings\es_settings.xml` (typically under `C:\Users\<username>\.ES-DE\settings\es_settings.xml` or `ES-DE\settings\es_settings.xml`)
+   - **macOS:** `~/.ES-DE/settings/es_settings.xml`
+   - **Linux:** `~/.ES-DE/settings/es_settings.xml`
 2. Search for the setting `<bool name="LegacyGamelistFileLocation" value="false" />`.
 3. Change its value to `true`:
    ```xml
