@@ -2,6 +2,7 @@ import os
 import sys
 import re
 import time
+import argparse
 from access_parser import AccessParser
 
 # Regex to strip XML-incompatible control characters (except tab, newline, carriage return)
@@ -31,12 +32,21 @@ def format_path(path):
     return path.replace('\\', '/')
 
 def main():
+    # Parse Command Line Arguments
+    parser = argparse.ArgumentParser(description="Convert GameBase MDB database to ES-DE gamelist.xml")
+    parser.add_argument("--mdb", default="GBC_v19.mdb", help="Path to GameBase MDB file (default: GBC_v19.mdb)")
+    
+    flatten_group = parser.add_mutually_exclusive_group()
+    flatten_group.add_argument("--flatten", action="store_true", default=None, help="Force flatten folders in ES-DE (creates flatten.txt)")
+    flatten_group.add_argument("--no-flatten", action="store_true", default=None, help="Force disable flattening (deletes flatten.txt)")
+    
+    args = parser.parse_args()
+    
     start_time = time.time()
     
-    db_path = "GBC_v19.mdb"
+    db_path = args.mdb
     if not os.path.exists(db_path):
-        print(f"Error: Database file '{db_path}' not found in the current directory.")
-        print("Please ensure GBC_v19.mdb is present here.")
+        print(f"Error: Database file '{db_path}' not found.")
         sys.exit(1)
         
     print(f"Loading GameBase database '{db_path}'...")
@@ -125,6 +135,36 @@ def main():
         os.makedirs(games_dir)
         print(f"Created directory: {games_dir}")
         
+    # Handle folder flattening configuration
+    flatten_choice = True
+    if args.flatten is True:
+        flatten_choice = True
+    elif args.no_flatten is True:
+        flatten_choice = False
+    else:
+        # Prompt if interactive
+        if sys.stdin.isatty() and sys.stdout.isatty():
+            try:
+                response = input("\nDo you want to flatten the game list in ES-DE?\n(This hides the subfolders and displays all games in a single flat list) [Y/n]: ").strip().lower()
+                if response in ["n", "no"]:
+                    flatten_choice = False
+            except (KeyboardInterrupt, EOFError):
+                print("\nPrompt interrupted, defaulting to Y (flatten).")
+        else:
+            print("\nNon-interactive environment, defaulting to Y (flatten).")
+            
+    flatten_file = os.path.join(games_dir, "flatten.txt")
+    if flatten_choice:
+        with open(flatten_file, "w", encoding="utf-8") as ff:
+            ff.write("# Tells ES-DE to display games recursively as a flat list, hiding subfolders.\n")
+        print("Folder flattening enabled (created Games/flatten.txt).")
+    else:
+        if os.path.exists(flatten_file):
+            os.remove(flatten_file)
+            print("Folder flattening disabled (removed Games/flatten.txt).")
+        else:
+            print("Folder flattening disabled.")
+            
     gamelist_path = os.path.join(games_dir, "gamelist.xml")
     print(f"Writing to {gamelist_path}...")
     
