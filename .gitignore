@@ -12,6 +12,7 @@ __pycache__/
 
 # Generated output XML and flattened folders
 Games/
+es_media/
 
 # GameBase Database
 GBC_v19.mdb

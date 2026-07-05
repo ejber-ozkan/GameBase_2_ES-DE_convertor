@@ -101,6 +101,38 @@ By default, when you run the script, it will ask you if you want to flatten fold
 
 ---
 
+## Media Linker Tool (Screenshots & Covers)
+
+Since ES-DE uses a strict **directory-based media scanner** (ignoring media paths in `gamelist.xml`), it expects media filenames to match the ROM filenames exactly and be structured in a specific folder layout. 
+
+The repository includes a second script, `link_gamebase_media.py`, which scans the GameBase database and creates zero-space **hard links** mapping your existing GameBase screenshots and cover images into the exact filenames and directory structure ES-DE expects.
+
+### How to Run the Media Linker
+
+To ensure zero-space hard links can be created, **the output directory must be on the same drive** as your GameBase files. If they are on different drives, the script will automatically copy the files instead.
+
+Run the media linker via Python (virtual env):
+```cmd
+.\venv\Scripts\python.exe link_gamebase_media.py --mdb "<path_to_mdb>" --system-name <es_system_name> --out-dir "<path_to_es_media>"
+```
+
+**Example (Atari 2600):**
+```cmd
+.\venv\Scripts\python.exe link_gamebase_media.py --mdb "E:\GameBase\Atari 2600\Atari 2600.mdb" --system-name atari2600 --out-dir "E:\GameBase\Atari 2600\es_media"
+```
+
+### Supported ES-DE System Names:
+Use these exact names for the `--system-name` argument:
+- Commodore 64: `c64`
+- Commodore Amiga: `amiga`
+- Atari 800: `atari800`
+- Atari 2600: `atari2600`
+- Acorn BBC Micro: `bbcmicro`
+- Sinclair ZX Spectrum: `zxspectrum`
+- VIC-20: `vic20`
+
+---
+
 ## EmulationStation (ES-DE) Integration Instructions
 
 Follow these steps to load your converted Commodore 64 GameBase library in ES-DE:
@@ -123,7 +155,18 @@ Since our `gamelist.xml` is placed inside the `Games/` directory and maps ROM fi
 1. Move or symlink `<GameBase C64 Root>/Games` into your ES-DE `roms/c64` directory, OR
 2. Configure ES-DE to use a custom directory path for `c64` pointing directly to your GameBase `Games` directory.
 
-### Step 3: Run ES-DE
+### Step 3: Configure ES-DE to Read the Converted Media Directory
+If you used the Media Linker tool to map screenshots and covers, configure ES-DE to use this unified folder:
+1. Open your ES-DE configuration settings file (`es_settings.xml`).
+2. Search for the setting `<string name="MediaDirectory" value="" />`.
+3. Set its value to the absolute path of the `es_media` directory:
+   ```xml
+   <string name="MediaDirectory" value="D:\Retro\GameBase_Root\es_media" />
+   ```
+4. Save and close the file.
+
+### Step 4: Run ES-DE
 Launch ES-DE. It will scan the `c64` ROMs folder, read the `gamelist.xml` inside it, and load your GameBase library.
 All metadata (names, descriptions, developers, publishers, genres, release dates, and ratings) along with their corresponding screenshots and cover images will display correctly!
 If flattening is enabled, all games will be presented in a single flat list, completely hiding the subfolder hierarchy.
+
