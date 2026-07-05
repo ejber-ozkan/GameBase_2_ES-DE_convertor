@@ -142,11 +142,45 @@ def parse_table(db, db_path, table_name):
                 print(f"Error: mdbtools fallback failed: {mdb_err}")
                 raise e
 
+def check_hardlink_support(src_dir, dst_dir):
+    # Check if we can create a hardlink between src_dir and dst_dir
+    if not os.path.exists(src_dir):
+        return False
+    os.makedirs(dst_dir, exist_ok=True)
+    
+    temp_src = os.path.join(src_dir, ".__link_test_src__")
+    temp_dst = os.path.join(dst_dir, ".__link_test_dst__")
+    
+    try:
+        with open(temp_src, "w") as f:
+            f.write("test")
+            
+        if os.path.exists(temp_dst):
+            os.remove(temp_dst)
+            
+        os.link(temp_src, temp_dst)
+        os.remove(temp_src)
+        os.remove(temp_dst)
+        return True
+    except OSError:
+        try:
+            os.remove(temp_src)
+        except OSError:
+            pass
+        try:
+            os.remove(temp_dst)
+        except OSError:
+            pass
+        return False
+
 def main():
     parser = argparse.ArgumentParser(description="Link GameBase Screenshots and Covers for ES-DE compatibility")
     parser.add_argument("--mdb", required=True, help="Path to GameBase MDB file")
     parser.add_argument("--system-name", required=True, help="ES-DE system folder name (e.g., atari2600)")
     parser.add_argument("--out-dir", default="es_media", help="Output directory for linked media (default: es_media)")
+    parser.add_argument("--action", choices=["auto", "link", "copy"], default="auto",
+                        help="auto: try hardlink, fallback to copy; link: strictly hardlink; copy: strictly copy")
+    parser.add_argument("-y", "--yes", action="store_true", help="Bypass interactive copy confirmation prompts")
     
     args = parser.parse_args()
     
@@ -165,9 +199,55 @@ def main():
     print(f"GameBase Root : {gb_root}")
     print(f"ES-DE System  : {args.system_name}")
     print(f"Output Path   : {os.path.abspath(args.out_dir)}")
+    print(f"Action Mode   : {args.action.upper()}")
     print("==================================================\n")
     
-    print(f"Loading database '{db_path}'...")
+    if not os.path.exists(screenshots_src_dir) and not os.path.exists(extras_src_dir):
+        print(f"Error: Neither Screenshots nor Extras directories were found under GameBase root: {gb_root}")
+        sys.exit(1)
+        
+    # Check link support
+    can_link = False
+    if os.path.exists(screenshots_src_dir):
+        can_link = check_hardlink_support(screenshots_src_dir, args.out_dir)
+    elif os.path.exists(extras_src_dir):
+        can_link = check_hardlink_support(extras_src_dir, args.out_dir)
+        
+    print(f"Cross-device / link capability check: Hardlink supported = {can_link}")
+    
+    # Determine the execution mode based on link support and arguments
+    execution_mode = "link"
+    if args.action == "copy":
+        execution_mode = "copy"
+        print("Forced COPY mode enabled.")
+    elif args.action == "link":
+        execution_mode = "link"
+        if not can_link:
+            print("\nError: Strictly LINK mode was selected, but hard-linking is not supported (cross-device/different drives).")
+            print("Aborting.")
+            sys.exit(1)
+    else: # auto mode
+        if can_link:
+            execution_mode = "link"
+            print("Hard-linking is supported. Will create zero-space hard links.")
+        else:
+            execution_mode = "copy"
+            print("Hard-linking is NOT supported (directories are on different drives/devices).")
+            
+            # Interactive prompt before copying files
+            if not args.yes and sys.stdin.isatty() and sys.stdout.isatty():
+                try:
+                    response = input("\nFiles must be COPIED to the target drive (this will consume disk space).\nDo you want to proceed with copying? [y/N]: ").strip().lower()
+                    if response not in ["y", "yes"]:
+                        print("Operation aborted by user.")
+                        sys.exit(0)
+                except (KeyboardInterrupt, EOFError):
+                    print("\nOperation aborted.")
+                    sys.exit(0)
+            else:
+                print("Proceeding automatically in COPY mode (non-interactive or --yes specified).")
+                
+    print(f"\nLoading database '{db_path}'...")
     try:
         db = AccessParser(db_path)
     except Exception as e:
@@ -217,7 +297,7 @@ def main():
     covers_copied = 0
     covers_missing = 0
     
-    print("\nProcessing media links...")
+    print(f"\nProcessing media ({execution_mode.upper()} mode)...")
     
     for i in range(num_rows):
         ga_id = g["GA_Id"][i]
@@ -228,7 +308,6 @@ def main():
         if not filename:
             continue
             
-        # Normalize ROM path to get parent subfolder and base ROM name
         rom_normalized = filename.replace('\\', '/')
         subfolder = os.path.dirname(rom_normalized)
         rom_basename = os.path.splitext(os.path.basename(rom_normalized))[0]
@@ -237,19 +316,22 @@ def main():
         if scrnshot:
             src_scrn_path = os.path.join(screenshots_src_dir, scrnshot)
             if os.path.exists(src_scrn_path):
-                # Target path structure: es_media/system/screenshots/subfolder/rom_basename.ext
                 ext = os.path.splitext(scrnshot)[1]
                 dst_folder = os.path.join(screenshots_dst_dir, subfolder)
                 os.makedirs(dst_folder, exist_ok=True)
                 dst_scrn_path = os.path.join(dst_folder, rom_basename + ext)
                 
-                try:
-                    if os.path.exists(dst_scrn_path):
-                        os.remove(dst_scrn_path)
-                    os.link(src_scrn_path, dst_scrn_path)
-                    screenshots_linked += 1
-                except OSError:
-                    # Fallback to copy if cross-device or unsupported
+                if os.path.exists(dst_scrn_path):
+                    os.remove(dst_scrn_path)
+                    
+                if execution_mode == "link":
+                    try:
+                        os.link(src_scrn_path, dst_scrn_path)
+                        screenshots_linked += 1
+                    except OSError as e:
+                        print(f"Error linking '{rom_basename}': {e}")
+                        screenshots_missing += 1
+                else: # copy mode
                     try:
                         shutil.copy2(src_scrn_path, dst_scrn_path)
                         screenshots_copied += 1
@@ -263,19 +345,22 @@ def main():
         if cover:
             src_cover_path = os.path.join(extras_src_dir, cover)
             if os.path.exists(src_cover_path):
-                # Target path structure: es_media/system/covers/subfolder/rom_basename.ext
                 ext = os.path.splitext(cover)[1]
                 dst_folder = os.path.join(covers_dst_dir, subfolder)
                 os.makedirs(dst_folder, exist_ok=True)
                 dst_cover_path = os.path.join(dst_folder, rom_basename + ext)
                 
-                try:
-                    if os.path.exists(dst_cover_path):
-                        os.remove(dst_cover_path)
-                    os.link(src_cover_path, dst_cover_path)
-                    covers_linked += 1
-                except OSError:
-                    # Fallback to copy if cross-device or unsupported
+                if os.path.exists(dst_cover_path):
+                    os.remove(dst_cover_path)
+                    
+                if execution_mode == "link":
+                    try:
+                        os.link(src_cover_path, dst_cover_path)
+                        covers_linked += 1
+                    except OSError as e:
+                        print(f"Error linking cover for '{rom_basename}': {e}")
+                        covers_missing += 1
+                else: # copy mode
                     try:
                         shutil.copy2(src_cover_path, dst_cover_path)
                         covers_copied += 1

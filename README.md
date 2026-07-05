@@ -109,16 +109,23 @@ The repository includes a second script, `link_gamebase_media.py`, which scans t
 
 ### How to Run the Media Linker
 
-To ensure zero-space hard links can be created, **the output directory must be on the same drive** as your GameBase files. If they are on different drives, the script will automatically copy the files instead.
+To ensure zero-space hard links can be created, **the output directory must be on the same drive** as your GameBase files. If they are on different drives (e.g. crossing from `E:` to `F:`), the script will automatically prompt to copy the files instead (which takes disk space) unless specified otherwise.
 
 Run the media linker via Python (virtual env):
 ```cmd
-.\venv\Scripts\python.exe link_gamebase_media.py --mdb "<path_to_mdb>" --system-name <es_system_name> --out-dir "<path_to_es_media>"
+.\venv\Scripts\python.exe link_gamebase_media.py --mdb "<path_to_mdb>" --system-name <es_system_name> --out-dir "<path_to_es_media>" [options]
 ```
 
-**Example (Atari 2600):**
+**Key Options:**
+- `--action {auto,link,copy}`:
+  - `auto` (default): Attempt hard-linking first. If directories are on different drives, fallback to copying (asking for confirmation if run in an interactive terminal).
+  - `link`: Force hard-linking only. Aborts with an error if it crosses drives.
+  - `copy`: Force copying files directly, skipping any hard-link attempts.
+- `-y`, `--yes`: Automatically accept copy fallback prompts when running in `auto` mode (useful for non-interactive batch runs).
+
+**Example (Atari 2600 Link/Copy to Global Media Folder):**
 ```cmd
-.\venv\Scripts\python.exe link_gamebase_media.py --mdb "E:\GameBase\Atari 2600\Atari 2600.mdb" --system-name atari2600 --out-dir "E:\GameBase\Atari 2600\es_media"
+.\venv\Scripts\python.exe link_gamebase_media.py --mdb "E:\GameBase\Atari 2600\Atari 2600.mdb" --system-name atari2600 --out-dir "F:\RETRO\ES-DE_ROMS\MEDIA" --action auto
 ```
 
 ### Supported ES-DE System Names:
