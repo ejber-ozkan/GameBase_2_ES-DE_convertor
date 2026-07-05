@@ -30,7 +30,7 @@ if not exist venv (
     )
     
     echo [INFO] Virtual environment created.
-    echo [INFO] Installing required dependencies (access-parser)...
+    echo [INFO] Installing required dependencies: access-parser...
     .\venv\Scripts\pip.exe install access-parser
     if errorlevel 1 (
         echo [ERROR] Failed to install access-parser library.
