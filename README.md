@@ -120,6 +120,10 @@ Since ES-DE uses a strict **directory-based media scanner** (ignoring media path
 
 The repository includes a second script, `link_gamebase_media.py`, which scans the GameBase database and creates zero-space **hard links** mapping your existing GameBase screenshots and cover images into the exact filenames and directory structure ES-DE expects.
 
+> [!CAUTION]
+> **Scraper Overwriting Warning:**
+> If you run the built-in scraper tool inside the ES-DE application, ES-DE will download new media assets and **overwrite** the corresponding screenshot or cover files in your media directory. If you are using hard links, this will overwrite the linked files (but will not affect the original source files in your GameBase directory). If you want to keep your GameBase images, ensure you do not run the ES-DE scraper on these systems, or configure the scraper settings accordingly.
+
 ### How to Run the Media Linker
 
 To ensure zero-space hard links can be created, **the output directory must be on the same drive** as your GameBase files. If they are on different drives (e.g. crossing from `E:` to `F:`), the script will automatically prompt to copy the files instead (which takes disk space) unless specified otherwise.
