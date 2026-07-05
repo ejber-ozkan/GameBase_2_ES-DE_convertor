@@ -10,9 +10,11 @@ venv/
 __pycache__/
 *.pyc
 
-# Generated output XML
-Games/gamelist.xml
-Games/flatten.txt
+# Generated output XML and flattened folders
+Games/
 
 # GameBase Database
 GBC_v19.mdb
+
+# Local test utility
+run_batch_conversions.py

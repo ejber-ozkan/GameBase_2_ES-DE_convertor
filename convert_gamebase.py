@@ -3,6 +3,11 @@ import sys
 import re
 import time
 import argparse
+import subprocess
+import json
+import tempfile
+import csv
+import io
 from access_parser import AccessParser
 
 # Regex to strip XML-incompatible control characters (except tab, newline, carriage return)
@@ -31,10 +36,151 @@ def format_path(path):
     # Normalize backslashes to forward slashes for ES-DE cross-platform compatibility
     return path.replace('\\', '/')
 
+def parse_table_via_oledb(db_path, table_name):
+    # Locate 32-bit PowerShell (required for Jet OLEDB OLE DB Provider)
+    sys_root = os.environ.get("SystemRoot", "C:\\Windows")
+    powershell_32 = os.path.join(sys_root, "SysWOW64", "WindowsPowerShell", "v1.0", "powershell.exe")
+    if not os.path.exists(powershell_32):
+        raise FileNotFoundError(f"32-bit PowerShell not found at {powershell_32}")
+        
+    ps_code = """param (
+    [string]$DbPath,
+    [string]$Table
+)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+$connStringNoPwd = "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=$DbPath;"
+$connStringPwd = "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=$DbPath;Jet OLEDB:Database Password=gamebase;"
+
+$conn = New-Object System.Data.OleDb.OleDbConnection($connStringNoPwd)
+try {
+    $conn.Open()
+} catch {
+    # Retry with standard GameBase database password
+    $conn = New-Object System.Data.OleDb.OleDbConnection($connStringPwd)
+    $conn.Open()
+}
+
+try {
+    $cmd = $conn.CreateCommand()
+    $cmd.CommandText = "SELECT * FROM [$Table]"
+    $da = New-Object System.Data.OleDb.OleDbDataAdapter($cmd)
+    $dt = New-Object System.Data.DataTable
+    $da.Fill($dt) | Out-Null
+    
+    $columns = $dt.Columns.ColumnName
+    $rows = foreach ($row in $dt.Rows) {
+        $obj = [ordered]@{}
+        foreach ($col in $columns) {
+            $obj[$col] = $row.$col
+        }
+        [PSCustomObject]$obj
+    }
+    $rows | ConvertTo-Json -Depth 2 -Compress
+} catch {
+    Write-Error $_.Exception.Message
+    exit 1
+} finally {
+    if ($conn.State -eq "Open") { $conn.Close() }
+}
+"""
+    
+    # Write script to a temporary file
+    temp_fd, temp_path = tempfile.mkstemp(suffix=".ps1")
+    try:
+        with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
+            f.write(ps_code)
+            
+        cmd = [
+            powershell_32,
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", temp_path,
+            "-DbPath", db_path,
+            "-Table", table_name
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if result.returncode != 0:
+            raise RuntimeError(f"PowerShell OLEDB export failed: {result.stderr or result.stdout}")
+            
+        output = result.stdout.strip()
+        if not output:
+            return {}
+            
+        data = json.loads(output)
+        if isinstance(data, dict):
+            # ConvertTo-Json returns a single dict instead of a list if there is only 1 row
+            data = [data]
+            
+        if not data:
+            return {}
+            
+        columns = data[0].keys()
+        columnar = {col: [] for col in columns}
+        for row in data:
+            for col in columns:
+                columnar[col].append(row.get(col))
+        return columnar
+    finally:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+
+def parse_table_via_mdbtools(db_path, table_name):
+    cmd = ["mdb-export", db_path, table_name]
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if result.returncode != 0:
+        raise RuntimeError(f"mdb-export failed: {result.stderr}")
+        
+    csv_data = result.stdout.strip()
+    if not csv_data:
+        return {}
+        
+    reader = csv.DictReader(io.StringIO(csv_data))
+    rows = list(reader)
+    if not rows:
+        return {}
+        
+    columns = reader.fieldnames
+    columnar = {col: [] for col in columns}
+    for row in rows:
+        for col in columns:
+            columnar[col].append(row.get(col))
+    return columnar
+
+def parse_table(db, db_path, table_name):
+    # Try using access-parser first
+    try:
+        print(f"Parsing '{table_name}' table via access-parser...")
+        return db.parse_table(table_name)
+    except Exception as e:
+        print(f"Warning: access-parser failed to parse '{table_name}': {e}")
+        
+        # Windows Fallback: OLEDB via 32-bit PowerShell
+        if sys.platform == "win32":
+            print(f"Attempting Windows OLEDB fallback for '{table_name}'...")
+            try:
+                return parse_table_via_oledb(db_path, table_name)
+            except Exception as oledb_err:
+                print(f"Error: Windows OLEDB fallback failed: {oledb_err}")
+                raise e
+                
+        # macOS/Linux Fallback: mdbtools
+        else:
+            print(f"Attempting macOS/Linux mdbtools fallback for '{table_name}'...")
+            try:
+                return parse_table_via_mdbtools(db_path, table_name)
+            except Exception as mdb_err:
+                print(f"Error: mdbtools fallback failed: {mdb_err}")
+                raise e
+
 def main():
     # Parse Command Line Arguments
     parser = argparse.ArgumentParser(description="Convert GameBase MDB database to ES-DE gamelist.xml")
     parser.add_argument("--mdb", default="GBC_v19.mdb", help="Path to GameBase MDB file (default: GBC_v19.mdb)")
+    parser.add_argument("--out-dir", "-o", default="Games", help="Path to output directory (default: Games)")
     
     flatten_group = parser.add_mutually_exclusive_group()
     flatten_group.add_argument("--flatten", action="store_true", default=None, help="Force flatten folders in ES-DE (creates flatten.txt)")
@@ -64,58 +210,64 @@ def main():
     # Years
     years_lookup = {}
     if "Years" in db.catalog:
-        t = db.parse_table("Years")
-        for i in range(len(t["YE_Id"])):
-            years_lookup[t["YE_Id"][i]] = t["Year"][i]
+        t = parse_table(db, db_path, "Years")
+        if t and "YE_Id" in t:
+            for i in range(len(t["YE_Id"])):
+                years_lookup[t["YE_Id"][i]] = t["Year"][i]
             
     # PGenres (Parent Genres)
     pgenres_lookup = {}
     if "PGenres" in db.catalog:
-        t = db.parse_table("PGenres")
-        for i in range(len(t["PG_Id"])):
-            pgenres_lookup[t["PG_Id"][i]] = t["ParentGenre"][i]
+        t = parse_table(db, db_path, "PGenres")
+        if t and "PG_Id" in t:
+            for i in range(len(t["PG_Id"])):
+                pgenres_lookup[t["PG_Id"][i]] = t["ParentGenre"][i]
             
     # Genres
     genres_lookup = {}
     if "Genres" in db.catalog:
-        t = db.parse_table("Genres")
-        for i in range(len(t["GE_Id"])):
-            ge_id = t["GE_Id"][i]
-            genre = t["Genre"][i]
-            pg_id = t["PG_Id"][i]
-            parent = pgenres_lookup.get(pg_id, "")
-            genres_lookup[ge_id] = (parent, genre)
+        t = parse_table(db, db_path, "Genres")
+        if t and "GE_Id" in t:
+            for i in range(len(t["GE_Id"])):
+                ge_id = t["GE_Id"][i]
+                genre = t["Genre"][i]
+                pg_id = t["PG_Id"][i]
+                parent = pgenres_lookup.get(pg_id, "")
+                genres_lookup[ge_id] = (parent, genre)
             
     # Developers
     devs_lookup = {}
     if "Developers" in db.catalog:
-        t = db.parse_table("Developers")
-        for i in range(len(t["DE_Id"])):
-            devs_lookup[t["DE_Id"][i]] = t["Developer"][i]
+        t = parse_table(db, db_path, "Developers")
+        if t and "DE_Id" in t:
+            for i in range(len(t["DE_Id"])):
+                devs_lookup[t["DE_Id"][i]] = t["Developer"][i]
             
     # Publishers
     pubs_lookup = {}
     if "Publishers" in db.catalog:
-        t = db.parse_table("Publishers")
-        for i in range(len(t["PU_Id"])):
-            pubs_lookup[t["PU_Id"][i]] = t["Publisher"][i]
+        t = parse_table(db, db_path, "Publishers")
+        if t and "PU_Id" in t:
+            for i in range(len(t["PU_Id"])):
+                pubs_lookup[t["PU_Id"][i]] = t["Publisher"][i]
             
     # Extras (Covers/Boxart)
     covers_lookup = {}
     if "Extras" in db.catalog:
         print("Indexing covers from 'Extras' table...")
-        t = db.parse_table("Extras")
-        for i in range(len(t["EX_Id"])):
-            ga_id = t["GA_Id"][i]
-            ext_type = t["Type"][i]
-            path = t["Path"][i]
-            
-            # Type 0 is cover art. We only want the first valid cover image per game.
-            if ext_type == 0 and ga_id not in covers_lookup:
-                lower_path = path.lower() if path else ""
-                if ("cover\\" in lower_path or "covers\\" in lower_path or "cover/" in lower_path or "covers/" in lower_path) and \
-                   (lower_path.endswith(".jpg") or lower_path.endswith(".jpeg") or lower_path.endswith(".png") or lower_path.endswith(".gif")):
-                    covers_lookup[ga_id] = path
+        t = parse_table(db, db_path, "Extras")
+        if t and "EX_Id" in t:
+            for i in range(len(t["EX_Id"])):
+                ga_id = t["GA_Id"][i]
+                ext_type = t["Type"][i]
+                path = t["Path"][i]
+                
+                # Type 0 is cover art. We only want the first valid cover image per game.
+                if ext_type == 0 and ga_id not in covers_lookup:
+                    lower_path = path.lower() if path else ""
+                    if ("cover\\" in lower_path or "covers\\" in lower_path or "cover/" in lower_path or "covers/" in lower_path) and \
+                       (lower_path.endswith(".jpg") or lower_path.endswith(".jpeg") or lower_path.endswith(".png") or lower_path.endswith(".gif")):
+                        covers_lookup[ga_id] = path
 
     print("Lookup tables indexed successfully.")
 
@@ -125,12 +277,12 @@ def main():
         sys.exit(1)
         
     print("Reading 'Games' table...")
-    g = db.parse_table("Games")
+    g = parse_table(db, db_path, "Games")
     num_rows = len(g["GA_Id"])
     print(f"Total games to process: {num_rows}")
     
-    # Ensure Games folder exists
-    games_dir = "Games"
+    # Ensure output folder exists
+    games_dir = args.out_dir
     if not os.path.exists(games_dir):
         os.makedirs(games_dir)
         print(f"Created directory: {games_dir}")
@@ -157,11 +309,11 @@ def main():
     if flatten_choice:
         with open(flatten_file, "w", encoding="utf-8") as ff:
             ff.write("# Tells ES-DE to display games recursively as a flat list, hiding subfolders.\n")
-        print("Folder flattening enabled (created Games/flatten.txt).")
+        print(f"Folder flattening enabled (created {flatten_file}).")
     else:
         if os.path.exists(flatten_file):
             os.remove(flatten_file)
-            print("Folder flattening disabled (removed Games/flatten.txt).")
+            print(f"Folder flattening disabled (removed {flatten_file}).")
         else:
             print("Folder flattening disabled.")
             
