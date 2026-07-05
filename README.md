@@ -1,6 +1,6 @@
 # GameBase to ES-DE Metadata Converter
 
-A platform-agnostic, dependency-free tool to convert Commodore 64 GameBase Access databases (`GBC_v19.mdb`) into metadata and media paths readable by **EmulationStation Desktop Edition (ES-DE)**.
+A platform-agnostic, dependency-free tool to convert GameBase Access databases (such as Commodore 64 GameBase) into metadata and media paths readable by **EmulationStation Desktop Edition (ES-DE)**.
 
 > [!NOTE]
 > **ES-DE vs. Legacy EmulationStation:**
@@ -9,6 +9,7 @@ A platform-agnostic, dependency-free tool to convert Commodore 64 GameBase Acces
 It generates a portable `gamelist.xml` file with parent-relative paths (`../`) so that ES-DE can access the existing GameBase screenshots and cover art without copying, moving, or duplicating any files.
 
 ![C64 Game List in ES-DE](ES_DE_GamebaseImport.png)
+![C64 Game List in ES-DE](ES_DE_GamebaseImport_2.png)
 
 ---
 
@@ -28,7 +29,7 @@ It generates a portable `gamelist.xml` file with parent-relative paths (`../`) s
 
 ## Supported Platforms
 
-The converter is platform-agnostic and will parse any database matching the standard GameBase database schema. The following systems have been explicitly converted and verified:
+The converter is platform-agnostic and will parse any database matching the standard GameBase database schema. The following systems have been explicitly tested and converted and verified:
 
 - **Commodore 64:** ~30,000 games
 - **Commodore Amiga:** ~3,036 games
