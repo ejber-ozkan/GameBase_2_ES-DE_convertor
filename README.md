@@ -26,6 +26,26 @@ It generates a portable `gamelist.xml` file with parent-relative paths (`../`) s
 
 ---
 
+## Supported Platforms
+
+The converter is platform-agnostic and will parse any database matching the standard GameBase database schema. The following systems have been explicitly converted and verified:
+
+- **Commodore 64:** ~30,000 games
+- **Commodore Amiga:** ~3,036 games
+- **Atari 800:** ~6,981 games
+- **Atari 2600:** ~573 games
+- **Acorn BBC Micro:** ~2,380 games
+- **Sinclair ZX Spectrum:** ~17,130 games
+- **VIC-20:** ~2,260 games
+
+*Other GameBase databases (such as Commodore 16/Plus 4, Atari ST, etc.) should work out of the box as well!*
+
+> [!WARNING]
+> **Screenshots Folder Compatibility:**
+> At the moment, the `Screenshots` folder structure or format in standard GameBase is not fully compatible with ES-DE's direct relative path matching. Screenshots may not display out of the box in ES-DE.
+
+---
+
 ## Directory Structure Requirement
 
 For parent-relative path mapping to resolve correctly, keep the standard GameBase directory structure:
