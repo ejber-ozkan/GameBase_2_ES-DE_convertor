@@ -129,3 +129,8 @@ For more details, see README.md and docs/QUICKSTART.md.
 - If push fails, resolve and retry until it succeeds
 
 <!-- END BEADS INTEGRATION -->
+
+
+> [!NOTE]
+> **ES-DE vs. Legacy EmulationStation:**
+> This converter targets **ES-DE (EmulationStation Desktop Edition)**, which is the newer, active fork hosted at [GitLab](https://gitlab.com/es-de/emulationstation-de) (cloned locally at `D:\MYSOURCE\OtherPeeps\emulationstation-de`). Do not confuse this with the older, legacy EmulationStation application.

@@ -4,9 +4,11 @@ A platform-agnostic, dependency-free tool to convert Commodore 64 GameBase Acces
 
 > [!NOTE]
 > **ES-DE vs. Legacy EmulationStation:**
-> This converter targets **ES-DE (EmulationStation Desktop Edition)**, which is the newer, active fork hosted at [GitLab](https://gitlab.com/es-de/emulationstation-de) (cloned locally at `D:\MYSOURCE\OtherPeeps\emulationstation-de`). Do not confuse this with the older, legacy EmulationStation application.
+> This converter targets **ES-DE (EmulationStation Desktop Edition)**, which is the newer, active fork hosted at [GitLab](https://gitlab.com/es-de/emulationstation-de)
 
 It generates a portable `gamelist.xml` file with parent-relative paths (`../`) so that ES-DE can access the existing GameBase screenshots and cover art without copying, moving, or duplicating any files.
+
+![C64 Game List in ES-DE](ES_DE_GamebaseImport.png)
 
 ---
 
