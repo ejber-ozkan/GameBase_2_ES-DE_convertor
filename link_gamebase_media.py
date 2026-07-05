@@ -181,6 +181,7 @@ def main():
     parser.add_argument("--action", choices=["auto", "link", "copy"], default="auto",
                         help="auto: try hardlink, fallback to copy; link: strictly hardlink; copy: strictly copy")
     parser.add_argument("-y", "--yes", action="store_true", help="Bypass interactive copy confirmation prompts")
+    parser.add_argument("--exclude-adult", action="store_true", help="Exclude games flagged as adult content in the database")
     
     args = parser.parse_args()
     
@@ -307,6 +308,12 @@ def main():
         
         if not filename:
             continue
+            
+        # Exclude adult content if flag set
+        if args.exclude_adult and "Adult" in g:
+            is_adult = g["Adult"][i]
+            if is_adult is True or is_adult == 1 or str(is_adult).lower() in ['true', '1']:
+                continue
             
         rom_normalized = filename.replace('\\', '/')
         subfolder = os.path.dirname(rom_normalized)

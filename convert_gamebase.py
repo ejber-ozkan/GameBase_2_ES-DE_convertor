@@ -181,6 +181,7 @@ def main():
     parser = argparse.ArgumentParser(description="Convert GameBase MDB database to ES-DE gamelist.xml")
     parser.add_argument("--mdb", default="GBC_v19.mdb", help="Path to GameBase MDB file (default: GBC_v19.mdb)")
     parser.add_argument("--out-dir", "-o", default="Games", help="Path to output directory (default: Games)")
+    parser.add_argument("--exclude-adult", action="store_true", help="Exclude games flagged as adult content in the database")
     
     flatten_group = parser.add_mutually_exclusive_group()
     flatten_group.add_argument("--flatten", action="store_true", default=None, help="Force flatten folders in ES-DE (creates flatten.txt)")
@@ -354,6 +355,12 @@ def main():
             # Skip records without a filename
             if not filename:
                 continue
+                
+            # Exclude adult content if flag set
+            if args.exclude_adult and "Adult" in g:
+                is_adult = g["Adult"][i]
+                if is_adult is True or is_adult == 1 or str(is_adult).lower() in ['true', '1']:
+                    continue
                 
             # ES-DE path for game (parent folder is Games, so relative path is ./...)
             rom_path = "./" + format_path(filename)

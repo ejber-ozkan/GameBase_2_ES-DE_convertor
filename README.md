@@ -42,8 +42,19 @@ The converter is platform-agnostic and will parse any database matching the stan
 *Other GameBase databases (such as Commodore 16/Plus 4, Atari ST, etc.) should work out of the box as well!*
 
 > [!WARNING]
-> **Screenshots Folder Compatibility:**
-> At the moment, the `Screenshots` folder structure or format in standard GameBase is not fully compatible with ES-DE's direct relative path matching. Screenshots may not display out of the box in ES-DE.
+> **Use at Your Own Risk**
+> These scripts read database structures and perform file linking/copying operations. While they have been thoroughly tested on multiple platforms, they are provided "as-is". **Use both scripts strictly at your own risk!** Always ensure you have backups of your GameBase databases and media files before running them.
+
+---
+
+## Recommended Script Usage Order
+
+To successfully convert a GameBase platform for ES-DE, run the scripts in this recommended order:
+
+1. **Step 1: Run the Metadata Converter (`convert_gamebase.py`)**
+   - This generates the `gamelist.xml` file inside the ROM directory, mapping all game metadata (names, descriptions, release dates, publishers, developers, genres, and ratings).
+2. **Step 2: Run the Media Linker (`link_gamebase_media.py`)**
+   - This scans the same database and maps screenshots/covers to the folder structure and filename layout that ES-DE expects.
 
 ---
 
@@ -67,13 +78,15 @@ For parent-relative path mapping to resolve correctly, keep the standard GameBas
 
 ---
 
-## How to Run
+## How to Run the Converter
 
-By default, when you run the script, it will ask you if you want to flatten folders in ES-DE (interactive terminal) or default to flattening (`Yes`). You can also control this behavior using command-line arguments:
+By default, when you run the script, it will ask you if you want to flatten folders in ES-DE (interactive terminal) or default to flattening (`Yes`). You can also control this behavior and other options using command-line arguments:
 
 - `--flatten`: Force folder flattening (creates `Games/flatten.txt`).
 - `--no-flatten`: Disable folder flattening (removes `Games/flatten.txt` if present).
 - `--mdb <path>`: Specify a custom path to your `.mdb` database file.
+- `--out-dir <path>` or `-o <path>`: Specify a custom path to the output directory (default: `Games`).
+- `--exclude-adult`: Exclude games flagged as adult content in the database.
 
 ### Windows
 1. Double-click `run_converter.bat`, or run it from command prompt/PowerShell:
@@ -122,6 +135,7 @@ Run the media linker via Python (virtual env):
   - `link`: Force hard-linking only. Aborts with an error if it crosses drives.
   - `copy`: Force copying files directly, skipping any hard-link attempts.
 - `-y`, `--yes`: Automatically accept copy fallback prompts when running in `auto` mode (useful for non-interactive batch runs).
+- `--exclude-adult`: Exclude linking media for games flagged as adult content in the database.
 
 **Example (Atari 2600 Link/Copy to Global Media Folder):**
 ```cmd
